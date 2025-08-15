@@ -1,9 +1,14 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>Livro AR com MindAR</title>
+
+    <!-- Importmap -->
     <script type="importmap">
       {
         "imports": {
@@ -13,39 +18,80 @@
         }
       }
     </script>
+
     <style>
-      html, body { margin:0; height:100%; overflow:hidden; background:#000; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+
+      /* Container em tela cheia, seguro para mobile */
+      #ar-container {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100dvh;   /* unidades dinâmicas evitam "salto" com barra do navegador */
+        height: 100svh;   /* fallback para iOS */
+        background: #000;
+        overflow: hidden;
+        touch-action: none;
+      }
+
+      /* Garanta que vídeo e canvas preencham o container */
+      #ar-container > video,
+      #ar-container > canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;  /* elimina faixas pretas */
+      }
+
+      /* Overlay de carregamento */
       #loading {
-        position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-        color:#fff; font-family:sans-serif; background:rgba(0,0,0,.5)
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: rgba(0, 0, 0, .5);
+        z-index: 10;
       }
     </style>
   </head>
+
   <body>
-    <div id="loading">Abrindo a câmera... autorize o uso.</div>
+    <div id="ar-container"></div>
+    <div id="loading">Abrindo a câmera… autorize o uso.</div>
 
     <script type="module">
       import * as THREE from "three";
       import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
       import { MindARThree } from "mindar-image-three";
 
-      const loadingDiv = document.getElementById("loading");
-
-      // 1) Inicializa MindAR
+      // 1) Inicializa MindAR no container dedicado
+      const container = document.querySelector("#ar-container");
       const mindarThree = new MindARThree({
-        container: document.body,
+        container,
         imageTargetSrc: "./targets/qr.mind",
-        maxTrack: 1,
+        maxTrack: 1
       });
+
       const { renderer, scene, camera } = mindarThree;
 
-      // Luz básica
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
+      // Iluminação básica
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+      scene.add(hemi);
 
-      // 2) Cria o anchor do alvo 0
+      // 2) Anchor do primeiro (e único) alvo do .mind
       const anchor = mindarThree.addAnchor(0);
 
-      // 3) Debug cube ANCORADO (útil para validar)
+      // 3) Cubo de debug ancorado (opcional)
       const debugCube = new THREE.Mesh(
         new THREE.BoxGeometry(0.2, 0.2, 0.2),
         new THREE.MeshNormalMaterial()
@@ -53,36 +99,49 @@
       debugCube.visible = false;
       anchor.group.add(debugCube);
 
-      // 4) Carrega o modelo e ANEXA ao anchor
+      // 4) Carregamento do modelo GLB e ancoragem
       const loader = new GLTFLoader();
       let model = null;
+
       loader.load(
         "./models/placeholder.glb",
         (gltf) => {
           model = gltf.scene;
-          model.scale.set(0.3, 0.3, 0.3);     // ajuste fino conforme necessário
-          model.position.set(0, 0, 0);        // centro do marcador
+          model.scale.set(0.3, 0.3, 0.3);   // ajuste fino conforme necessário
+          model.position.set(0, 0, 0);      // centro do marcador
+          model.rotation.set(0, 0, 0);
           model.visible = false;
           anchor.group.add(model);
-          console.log("Modelo GLB carregado e anexado ao anchor.");
+          console.log("Modelo GLB carregado e ancorado.");
         },
         undefined,
         (err) => console.error("Erro ao carregar GLB:", err)
       );
 
-      // 5) Reações ao tracking
+      // 5) Mostrar/ocultar quando o alvo é detectado
       anchor.onTargetFound = () => {
-        if (model) model.visible = true;
         debugCube.visible = true;
+        if (model) model.visible = true;
       };
       anchor.onTargetLost = () => {
-        if (model) model.visible = false;
         debugCube.visible = false;
+        if (model) model.visible = false;
       };
 
-      // 6) Start e render loop
+      // 6) Início do AR e laço de renderização
       await mindarThree.start();
-      loadingDiv.style.display = "none";
+      document.getElementById("loading").style.display = "none";
+
+      const onResize = () => {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        renderer.setSize(w, h);
+        renderer.setPixelRatio(window.devicePixelRatio || 1);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      };
+      window.addEventListener("resize", onResize);
+      onResize();
 
       renderer.setAnimationLoop(() => {
         renderer.render(scene, camera);
