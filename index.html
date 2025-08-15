@@ -14,75 +14,78 @@
       }
     </script>
     <style>
-      body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-      #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: sans-serif; font-size: 1.5em; color: white; background-color: rgba(0, 0, 0, 0.5); padding: 20px; border-radius: 10px; }
+      html, body { margin:0; height:100%; overflow:hidden; background:#000; }
+      #loading {
+        position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+        color:#fff; font-family:sans-serif; background:rgba(0,0,0,.5)
+      }
     </style>
   </head>
   <body>
-    <div id="loading">Abrindo a câmera... Por favor, autorize o uso.</div>
+    <div id="loading">Abrindo a câmera... autorize o uso.</div>
 
     <script type="module">
       import * as THREE from "three";
       import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
       import { MindARThree } from "mindar-image-three";
 
-      document.addEventListener("DOMContentLoaded", async () => {
-        const loadingDiv = document.getElementById("loading");
+      const loadingDiv = document.getElementById("loading");
 
-        const mindarThree = new MindARThree({
-          container: document.body,
-          imageTargetSrc: "./targets/qr.mind",
-          maxTrack: 1,
-        });
-        const { renderer, scene, camera } = mindarThree;
+      // 1) Inicializa MindAR
+      const mindarThree = new MindARThree({
+        container: document.body,
+        imageTargetSrc: "./targets/qr.mind",
+        maxTrack: 1,
+      });
+      const { renderer, scene, camera } = mindarThree;
 
-        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-        scene.add(light);
-        
-        // ---- INÍCIO DO TESTE DO CUBO DE DEPURAÇÃO ----
-        const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-        const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-        const testCube = new THREE.Mesh(geometry, material);
-        let cubePlaced = false;
-        // ---- FIM DO TESTE DO CUBO DE DEPURAÇÃO ----
+      // Luz básica
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
 
-        const loader = new GLTFLoader();
-        const anchor = mindarThree.addAnchor(0);
-        
-        loader.load("./models/placeholder.glb", (gltf) => {
-            console.log("Modelo 3D carregado, mas será ignorado para o teste.");
-        });
+      // 2) Cria o anchor do alvo 0
+      const anchor = mindarThree.addAnchor(0);
 
-        anchor.onTargetFound = () => {
-          console.log("Alvo encontrado! Tentando exibir o CUBO VERMELHO.");
-          if (!cubePlaced) {
-            scene.add(testCube);
+      // 3) Debug cube ANCORADO (útil para validar)
+      const debugCube = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 0.2, 0.2),
+        new THREE.MeshNormalMaterial()
+      );
+      debugCube.visible = false;
+      anchor.group.add(debugCube);
 
-            const cameraPosition = new THREE.Vector3();
-            camera.getWorldPosition(cameraPosition);
-            testCube.position.copy(cameraPosition);
+      // 4) Carrega o modelo e ANEXA ao anchor
+      const loader = new GLTFLoader();
+      let model = null;
+      loader.load(
+        "./models/placeholder.glb",
+        (gltf) => {
+          model = gltf.scene;
+          model.scale.set(0.3, 0.3, 0.3);     // ajuste fino conforme necessário
+          model.position.set(0, 0, 0);        // centro do marcador
+          model.visible = false;
+          anchor.group.add(model);
+          console.log("Modelo GLB carregado e anexado ao anchor.");
+        },
+        undefined,
+        (err) => console.error("Erro ao carregar GLB:", err)
+      );
 
-            const cameraDirection = new THREE.Vector3();
-            camera.getWorldDirection(cameraDirection);
-            
-            testCube.position.add(cameraDirection.multiplyScalar(1));
-            
-            console.log("Cubo adicionado à cena na posição:", testCube.position);
-            
-            cubePlaced = true;
-          }
-        };
+      // 5) Reações ao tracking
+      anchor.onTargetFound = () => {
+        if (model) model.visible = true;
+        debugCube.visible = true;
+      };
+      anchor.onTargetLost = () => {
+        if (model) model.visible = false;
+        debugCube.visible = false;
+      };
 
-        await mindarThree.start();
-        loadingDiv.style.display = "none";
+      // 6) Start e render loop
+      await mindarThree.start();
+      loadingDiv.style.display = "none";
 
-        renderer.setAnimationLoop(() => {
-          if (cubePlaced) {
-            testCube.rotation.y += 0.01;
-            testCube.rotation.x += 0.01;
-          }
-          renderer.render(scene, camera);
-        });
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
       });
     </script>
   </body>
