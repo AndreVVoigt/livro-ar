@@ -1,115 +1,79 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta charset="UTF-8" />
-    <title>Livro AR com MindAR</title>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/",
-          "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
-        }
+<script type="module">
+  import * as THREE from "three";
+  import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+  import { MindARThree } from "mindar-image-three";
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    const loadingDiv = document.getElementById("loading");
+
+    const mindarThree = new MindARThree({
+      container: document.body,
+      imageTargetSrc: "./targets/qr.mind",
+      maxTrack: 1,
+    });
+    const { renderer, scene, camera } = mindarThree;
+
+    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+    scene.add(light);
+    
+    // ---- INÍCIO DO TESTE DO CUBO DE DEPURAÇÃO ----
+
+    // 1. Criamos um cubo vermelho simples.
+    const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Vermelho brilhante
+    const testCube = new THREE.Mesh(geometry, material);
+    let cubePlaced = false;
+
+    // ---- FIM DO TESTE DO CUBO DE DEPURAÇÃO ----
+
+
+    // Carregamos o modelo 3D normalmente, mas não o usaremos por enquanto.
+    const loader = new GLTFLoader();
+    const anchor = mindarThree.addAnchor(0);
+    let loadedModel = null;
+
+    loader.load("./models/placeholder.glb", (gltf) => {
+        console.log("Modelo 3D carregado, mas será ignorado para o teste.");
+        loadedModel = gltf.scene; 
+    });
+
+    // Quando o alvo for encontrado...
+    anchor.onTargetFound = () => {
+      console.log("Alvo encontrado! Tentando exibir o CUBO VERMELHO.");
+
+      // Se o cubo ainda não foi posicionado...
+      if (!cubePlaced) {
+        // 2. Adicionamos o CUBO VERMELHO diretamente à CENA.
+        scene.add(testCube);
+
+        // 3. Posicionamos o cubo 1 metro à frente da câmera (e um pouco abaixo).
+        // Usamos a própria câmera como referência, ignorando a posição do QR Code.
+        const cameraPosition = new THREE.Vector3();
+        camera.getWorldPosition(cameraPosition);
+        testCube.position.copy(cameraPosition);
+
+        const cameraDirection = new THREE.Vector3();
+        camera.getWorldDirection(cameraDirection);
+        
+        // Move o cubo na direção que a câmera está olhando
+        testCube.position.add(cameraDirection.multiplyScalar(1)); // 1 metro à frente
+        
+        console.log("Cubo adicionado à cena na posição:", testCube.position);
+        
+        cubePlaced = true;
       }
-    </script>
-    <style>
-      body,
-      html {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
+    };
+
+    await mindarThree.start();
+    loadingDiv.style.display = "none";
+
+    renderer.setAnimationLoop(() => {
+      // 4. Se o cubo foi posicionado, fazemos ele girar.
+      if (cubePlaced) {
+        testCube.rotation.y += 0.01;
+        testCube.rotation.x += 0.01;
       }
-      #loading {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-family: sans-serif;
-        font-size: 1.5em;
-        color: white;
-        background-color: rgba(0, 0, 0, 0.5);
-        padding: 20px;
-        border-radius: 10px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="loading">Abrindo a câmera... Por favor, autorize o uso.</div>
-
-    <script type="module">
-      import * as THREE from "three";
-      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-      import { MindARThree } from "mindar-image-three";
-
-      document.addEventListener("DOMContentLoaded", async () => {
-        const loadingDiv = document.getElementById("loading");
-
-        const mindarThree = new MindARThree({
-          container: document.body,
-          imageTargetSrc: "./targets/qr.mind",
-          maxTrack: 1,
-        });
-        const { renderer, scene, camera } = mindarThree;
-
-        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-        scene.add(light);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-        directionalLight.position.set(0, 10, 5);
-        scene.add(directionalLight);
-
-        // NOVO: Variável de controle para saber se o modelo já foi posicionado
-        let modelPlaced = false;
-
-        const loader = new GLTFLoader();
-        const anchor = mindarThree.addAnchor(0);
-        let loadedModel = null;
-
-        loader.load("./models/placeholder.glb", (gltf) => {
-          loadedModel = gltf.scene; // Guarda a referência do modelo
-          loadedModel.scale.set(0.1, 0.1, 0.1);
-          loadedModel.position.set(0, 0, 0);
-          // NÃO adicionamos o modelo à âncora ainda.
-        });
-
-        // ALTERAÇÃO: Usando o evento onTargetFound para posicionar o modelo
-        anchor.onTargetFound = () => {
-          // Se o modelo já foi carregado e AINDA NÃO foi posicionado
-          if (loadedModel && !modelPlaced) {
-            // Pega a posição e rotação da âncora no mundo
-            const position = new THREE.Vector3();
-            const quaternion = new THREE.Quaternion();
-            anchor.group.getWorldPosition(position);
-            anchor.group.getWorldQuaternion(quaternion);
-
-            // Adiciona o modelo diretamente à CENA PRINCIPAL
-            scene.add(loadedModel);
-            // Aplica a posição e rotação capturadas
-            loadedModel.position.copy(position);
-            loadedModel.quaternion.copy(quaternion);
-
-            // Marca que o modelo foi posicionado
-            modelPlaced = true;
-          }
-        };
-
-        // NOVO: Podemos deixar o onTargetLost vazio para não fazer nada quando o alvo for perdido
-        anchor.onTargetLost = () => {};
-
-        await mindarThree.start();
-        loadingDiv.style.display = "none";
-
-        renderer.setAnimationLoop(() => {
-          // ALTERAÇÃO: Só rotaciona se o modelo já foi posicionado na cena
-          if (modelPlaced && loadedModel) {
-            // Rotaciona o modelo no eixo Y
-            loadedModel.rotation.y += 0.01;
-          }
-          renderer.render(scene, camera);
-        });
-      });
-    </script>
-  </body>
-</html>
+      renderer.render(scene, camera);
+    });
+  });
+</script>
