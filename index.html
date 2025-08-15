@@ -1,79 +1,89 @@
-<script type="module">
-  import * as THREE from "three";
-  import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-  import { MindARThree } from "mindar-image-three";
-
-  document.addEventListener("DOMContentLoaded", async () => {
-    const loadingDiv = document.getElementById("loading");
-
-    const mindarThree = new MindARThree({
-      container: document.body,
-      imageTargetSrc: "./targets/qr.mind",
-      maxTrack: 1,
-    });
-    const { renderer, scene, camera } = mindarThree;
-
-    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-    scene.add(light);
-    
-    // ---- INÍCIO DO TESTE DO CUBO DE DEPURAÇÃO ----
-
-    // 1. Criamos um cubo vermelho simples.
-    const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Vermelho brilhante
-    const testCube = new THREE.Mesh(geometry, material);
-    let cubePlaced = false;
-
-    // ---- FIM DO TESTE DO CUBO DE DEPURAÇÃO ----
-
-
-    // Carregamos o modelo 3D normalmente, mas não o usaremos por enquanto.
-    const loader = new GLTFLoader();
-    const anchor = mindarThree.addAnchor(0);
-    let loadedModel = null;
-
-    loader.load("./models/placeholder.glb", (gltf) => {
-        console.log("Modelo 3D carregado, mas será ignorado para o teste.");
-        loadedModel = gltf.scene; 
-    });
-
-    // Quando o alvo for encontrado...
-    anchor.onTargetFound = () => {
-      console.log("Alvo encontrado! Tentando exibir o CUBO VERMELHO.");
-
-      // Se o cubo ainda não foi posicionado...
-      if (!cubePlaced) {
-        // 2. Adicionamos o CUBO VERMELHO diretamente à CENA.
-        scene.add(testCube);
-
-        // 3. Posicionamos o cubo 1 metro à frente da câmera (e um pouco abaixo).
-        // Usamos a própria câmera como referência, ignorando a posição do QR Code.
-        const cameraPosition = new THREE.Vector3();
-        camera.getWorldPosition(cameraPosition);
-        testCube.position.copy(cameraPosition);
-
-        const cameraDirection = new THREE.Vector3();
-        camera.getWorldDirection(cameraDirection);
-        
-        // Move o cubo na direção que a câmera está olhando
-        testCube.position.add(cameraDirection.multiplyScalar(1)); // 1 metro à frente
-        
-        console.log("Cubo adicionado à cena na posição:", testCube.position);
-        
-        cubePlaced = true;
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+    <title>Livro AR com MindAR</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/",
+          "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+        }
       }
-    };
+    </script>
+    <style>
+      body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+      #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: sans-serif; font-size: 1.5em; color: white; background-color: rgba(0, 0, 0, 0.5); padding: 20px; border-radius: 10px; }
+    </style>
+  </head>
+  <body>
+    <div id="loading">Abrindo a câmera... Por favor, autorize o uso.</div>
 
-    await mindarThree.start();
-    loadingDiv.style.display = "none";
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { MindARThree } from "mindar-image-three";
 
-    renderer.setAnimationLoop(() => {
-      // 4. Se o cubo foi posicionado, fazemos ele girar.
-      if (cubePlaced) {
-        testCube.rotation.y += 0.01;
-        testCube.rotation.x += 0.01;
-      }
-      renderer.render(scene, camera);
-    });
-  });
-</script>
+      document.addEventListener("DOMContentLoaded", async () => {
+        const loadingDiv = document.getElementById("loading");
+
+        const mindarThree = new MindARThree({
+          container: document.body,
+          imageTargetSrc: "./targets/qr.mind",
+          maxTrack: 1,
+        });
+        const { renderer, scene, camera } = mindarThree;
+
+        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+        scene.add(light);
+        
+        // ---- INÍCIO DO TESTE DO CUBO DE DEPURAÇÃO ----
+        const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const testCube = new THREE.Mesh(geometry, material);
+        let cubePlaced = false;
+        // ---- FIM DO TESTE DO CUBO DE DEPURAÇÃO ----
+
+        const loader = new GLTFLoader();
+        const anchor = mindarThree.addAnchor(0);
+        
+        loader.load("./models/placeholder.glb", (gltf) => {
+            console.log("Modelo 3D carregado, mas será ignorado para o teste.");
+        });
+
+        anchor.onTargetFound = () => {
+          console.log("Alvo encontrado! Tentando exibir o CUBO VERMELHO.");
+          if (!cubePlaced) {
+            scene.add(testCube);
+
+            const cameraPosition = new THREE.Vector3();
+            camera.getWorldPosition(cameraPosition);
+            testCube.position.copy(cameraPosition);
+
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            
+            testCube.position.add(cameraDirection.multiplyScalar(1));
+            
+            console.log("Cubo adicionado à cena na posição:", testCube.position);
+            
+            cubePlaced = true;
+          }
+        };
+
+        await mindarThree.start();
+        loadingDiv.style.display = "none";
+
+        renderer.setAnimationLoop(() => {
+          if (cubePlaced) {
+            testCube.rotation.y += 0.01;
+            testCube.rotation.x += 0.01;
+          }
+          renderer.render(scene, camera);
+        });
+      });
+    </script>
+  </body>
+</html>
