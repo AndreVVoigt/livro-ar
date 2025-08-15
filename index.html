@@ -54,49 +54,58 @@
         });
         const { renderer, scene, camera } = mindarThree;
 
-        // Adiciona uma iluminação mais natural para ver melhor o modelo 3D.
         const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
         scene.add(light);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
         directionalLight.position.set(0, 10, 5);
         scene.add(directionalLight);
 
+        // NOVO: Variável de controle para saber se o modelo já foi posicionado
+        let modelPlaced = false;
+
         const loader = new GLTFLoader();
-        // A âncora é o ponto no espaço que fica "colado" na imagem do mundo real.
         const anchor = mindarThree.addAnchor(0);
-        let loadedModel = null; // Variável para guardar nosso modelo
+        let loadedModel = null;
 
-        loader.load(
-          "./models/placeholder.glb",
-          (gltf) => {
-            // Ajusta a escala inicial do modelo para ele não aparecer gigante.
-            gltf.scene.scale.set(0.1, 0.1, 0.1);
-            // Adiciona o modelo 3D na âncora.
-            anchor.group.add(gltf.scene);
-            loadedModel = gltf.scene; // Guarda a referência para animar depois
-          },
-          // Função de progresso (opcional, mas bom para UX)
-          (xhr) => {
-             loadingDiv.innerText = `Carregando modelo 3D... ${Math.round((xhr.loaded / xhr.total) * 100)}%`;
-          },
-          // Função de erro
-          (error) => {
-            console.error("Erro ao carregar o modelo:", error);
-            loadingDiv.innerText = "Erro ao carregar o modelo. Verifique o console.";
+        loader.load("./models/placeholder.glb", (gltf) => {
+          loadedModel = gltf.scene; // Guarda a referência do modelo
+          loadedModel.scale.set(0.1, 0.1, 0.1);
+          loadedModel.position.set(0, 0, 0);
+          // NÃO adicionamos o modelo à âncora ainda.
+        });
+
+        // ALTERAÇÃO: Usando o evento onTargetFound para posicionar o modelo
+        anchor.onTargetFound = () => {
+          // Se o modelo já foi carregado e AINDA NÃO foi posicionado
+          if (loadedModel && !modelPlaced) {
+            // Pega a posição e rotação da âncora no mundo
+            const position = new THREE.Vector3();
+            const quaternion = new THREE.Quaternion();
+            anchor.group.getWorldPosition(position);
+            anchor.group.getWorldQuaternion(quaternion);
+
+            // Adiciona o modelo diretamente à CENA PRINCIPAL
+            scene.add(loadedModel);
+            // Aplica a posição e rotação capturadas
+            loadedModel.position.copy(position);
+            loadedModel.quaternion.copy(quaternion);
+
+            // Marca que o modelo foi posicionado
+            modelPlaced = true;
           }
-        );
+        };
 
-        // Inicia o MindAR (pede permissão da câmera, etc.)
+        // NOVO: Podemos deixar o onTargetLost vazio para não fazer nada quando o alvo for perdido
+        anchor.onTargetLost = () => {};
+
         await mindarThree.start();
-
-        // Esconde a mensagem de "Carregando"
         loadingDiv.style.display = "none";
 
-        // Loop de renderização contínuo
         renderer.setAnimationLoop(() => {
-          // Exemplo de animação: se o modelo foi carregado, ele gira suavemente.
-          if (loadedModel) {
-            // loadedModel.rotation.y += 0.01;
+          // ALTERAÇÃO: Só rotaciona se o modelo já foi posicionado na cena
+          if (modelPlaced && loadedModel) {
+            // Rotaciona o modelo no eixo Y
+            loadedModel.rotation.y += 0.01;
           }
           renderer.render(scene, camera);
         });
