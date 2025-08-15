@@ -37,15 +37,16 @@
     </style>
   </head>
   <body>
-    <div id="loading">Carregando ambiente AR…</div>
+    <div id="loading">Abrindo a câmera... Por favor, autorize o uso.</div>
 
     <script type="module">
       import * as THREE from "three";
       import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
       import { MindARThree } from "mindar-image-three";
 
       document.addEventListener("DOMContentLoaded", async () => {
+        const loadingDiv = document.getElementById("loading");
+
         const mindarThree = new MindARThree({
           container: document.body,
           imageTargetSrc: "./targets/qr.mind",
@@ -53,30 +54,50 @@
         });
         const { renderer, scene, camera } = mindarThree;
 
+        // Adiciona uma iluminação mais natural para ver melhor o modelo 3D.
         const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
         scene.add(light);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(0, 10, 5);
+        scene.add(directionalLight);
 
         const loader = new GLTFLoader();
+        // A âncora é o ponto no espaço que fica "colado" na imagem do mundo real.
         const anchor = mindarThree.addAnchor(0);
+        let loadedModel = null; // Variável para guardar nosso modelo
 
         loader.load(
-          // --- CORREÇÃO: Voltamos para o caminho relativo (sem a barra no início) ---
           "./models/placeholder.glb",
           (gltf) => {
+            // Ajusta a escala inicial do modelo para ele não aparecer gigante.
             gltf.scene.scale.set(0.1, 0.1, 0.1);
+            // Adiciona o modelo 3D na âncora.
             anchor.group.add(gltf.scene);
-
-            const controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.target = anchor.group.position;
+            loadedModel = gltf.scene; // Guarda a referência para animar depois
+          },
+          // Função de progresso (opcional, mas bom para UX)
+          (xhr) => {
+             loadingDiv.innerText = `Carregando modelo 3D... ${Math.round((xhr.loaded / xhr.total) * 100)}%`;
+          },
+          // Função de erro
+          (error) => {
+            console.error("Erro ao carregar o modelo:", error);
+            loadingDiv.innerText = "Erro ao carregar o modelo. Verifique o console.";
           }
         );
 
+        // Inicia o MindAR (pede permissão da câmera, etc.)
         await mindarThree.start();
 
-        document.getElementById("loading").style.display = "none";
+        // Esconde a mensagem de "Carregando"
+        loadingDiv.style.display = "none";
 
+        // Loop de renderização contínuo
         renderer.setAnimationLoop(() => {
+          // Exemplo de animação: se o modelo foi carregado, ele gira suavemente.
+          if (loadedModel) {
+            // loadedModel.rotation.y += 0.01;
+          }
           renderer.render(scene, camera);
         });
       });
