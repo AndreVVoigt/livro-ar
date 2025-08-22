@@ -33,7 +33,7 @@
         position: fixed;
         inset: 0;
         width: 100vw;
-        height: 100dvh;   /* unidades dinâmicas evitam "salto" com barra do navegador */
+        height: 100dvh;   /* unidades dinâmicas evitam "salto" com a barra do navegador */
         height: 100svh;   /* fallback para iOS */
         background: #000;
         overflow: hidden;
@@ -72,24 +72,53 @@
     <script type="module">
       import * as THREE from "three";
       import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
       import { MindARThree } from "mindar-image-three";
 
       // 1) Inicializa MindAR no container dedicado
       const container = document.querySelector("#ar-container");
       const mindarThree = new MindARThree({
         container,
-        imageTargetSrc: "./targets/qr.mind",
-        maxTrack: 1
+        imageTargetSrc: "./targets/page1.mind",
+        maxTrack: 1,
+        filterMinCF: 0.0005,   // mais baixo = mais suave
+        filterBeta:   0.01,    // maior = responde mais rápido
+        warmupTolerance: 2,    // evita falso positivo ao iniciar
+        missTolerance:   2     // evita falso “perdeu alvo”
       });
 
       const { renderer, scene, camera } = mindarThree;
 
-      // Iluminação básica
-      const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-      scene.add(hemi);
+      // Iluminação (inclui sombra para contato)
+      renderer.shadowMap.enabled = true;
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.6));
+
+      const dir = new THREE.DirectionalLight(0xffffff, 1);
+      dir.position.set(0.6, 1.2, 0.8);
+      dir.castShadow = true;
+      dir.shadow.mapSize.set(1024, 1024);
+      scene.add(dir);
 
       // 2) Anchor do primeiro (e único) alvo do .mind
       const anchor = mindarThree.addAnchor(0);
+
+      // (Opcional) Plano de oclusão e plano receptor de sombra ancorados à página
+      const GROUND_SIZE = 1.0; // ~largura do alvo
+      const occluder = new THREE.Mesh(
+        new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
+        new THREE.MeshBasicMaterial({ colorWrite: false })
+      );
+      occluder.renderOrder = 0;
+      anchor.group.add(occluder);
+
+      const shadowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
+        new THREE.ShadowMaterial({ opacity: 0.35 })
+      );
+      shadowPlane.receiveShadow = true;
+      shadowPlane.position.z = 0.0002; // evita z-fighting
+      shadowPlane.renderOrder = 1;
+      anchor.group.add(shadowPlane);
 
       // 3) Cubo de debug ancorado (opcional)
       const debugCube = new THREE.Mesh(
@@ -99,26 +128,62 @@
       debugCube.visible = false;
       anchor.group.add(debugCube);
 
-      // 4) Carregamento do modelo GLB e ancoragem
+      // 4) Função utilitária: encaixa o modelo na página e "apoia" no plano (Z)
+      const TARGET_PORTION = 0.35; // 35% da largura do alvo
+      function fitAndPlaceOnPage(obj, portion = TARGET_PORTION) {
+        obj.updateWorldMatrix(true, true);
+        const box = new THREE.Box3().setFromObject(obj);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+
+        const maxXY = Math.max(size.x, size.y) || 1e-6;
+        const s = portion / maxXY;
+        obj.scale.multiplyScalar(s);
+
+        // Recalcula e apoia no "chão"
+        obj.updateWorldMatrix(true, true);
+        const box2 = new THREE.Box3().setFromObject(obj);
+        const heightZ = box2.max.z - box2.min.z;
+        obj.position.set(0, 0, heightZ / 2 + 0.003);
+      }
+
+      // 5) Carregamento do modelo GLB (Minerva.glb) e ancoragem
       const loader = new GLTFLoader();
+
+      // (Opcional) Caso Minerva.glb esteja comprimido com Draco
+      const draco = new DRACOLoader();
+      draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+      loader.setDRACOLoader(draco);
+
       let model = null;
 
       loader.load(
-        "./models/placeholder.glb",
+        "./models/Minerva.glb",
         (gltf) => {
           model = gltf.scene;
-          model.scale.set(0.3, 0.3, 0.3);   // ajuste fino conforme necessário
-          model.position.set(0, 0, 0);      // centro do marcador
-          model.rotation.set(0, 0, 0);
-          model.visible = false;
+
+          // Habilita sombras
+          model.traverse((n) => {
+            if (n.isMesh) n.castShadow = true;
+          });
+
           anchor.group.add(model);
-          console.log("Modelo GLB carregado e ancorado.");
+
+          // Se vier “deitado”/virado, ajuste aqui:
+          // model.rotation.x = -Math.PI / 2;
+          // model.rotation.y = Math.PI;
+
+          // Encaixa e apoia na página
+          fitAndPlaceOnPage(model, 1); // ajuste 0.2–0.6 conforme preferir
+
+          model.visible = false;
+          console.log("Minerva.glb carregado, ancorado e posicionado.");
         },
         undefined,
-        (err) => console.error("Erro ao carregar GLB:", err)
+        (err) => console.error("Erro ao carregar Minerva.glb:", err)
       );
 
-      // 5) Mostrar/ocultar quando o alvo é detectado
+      // 6) Mostrar/ocultar quando o alvo é detectado
       anchor.onTargetFound = () => {
         debugCube.visible = true;
         if (model) model.visible = true;
@@ -128,7 +193,7 @@
         if (model) model.visible = false;
       };
 
-      // 6) Início do AR e laço de renderização
+      // 7) Início do AR e laço de renderização
       await mindarThree.start();
       document.getElementById("loading").style.display = "none";
 
