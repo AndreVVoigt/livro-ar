@@ -1,216 +1,181 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <title>Livro AR com MindAR</title>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Livro AR — Carregamento Estável</title>
 
-    <!-- Importmap -->
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/",
-          "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/",
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      }
+    }
+  </script>
+
+  <style>
+    html,body{margin:0;height:100%;background:#000;overflow:hidden}
+    #ar{position:fixed;inset:0;width:100vw;height:100dvh;height:100svh;touch-action:none}
+    #ar>video,#ar>canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .ui{position:fixed;z-index:20;font:14px system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    #loading{inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.5)}
+    #toolbar{left:50%;transform:translateX(-50%);bottom:10px;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.5);padding:8px 10px;border-radius:12px;color:#fff}
+    #toolbar select,#toolbar button{font:14px system-ui;padding:6px 10px;border-radius:8px;border:1px solid #666;background:#1f1f1f;color:#fff}
+    #badge{right:10px;top:10px;background:rgba(0,0,0,.55);color:#fff;padding:6px 10px;border-radius:10px}
+    #scanningUI{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:transparent;z-index:10}
+    .scanningBox{width:60vmin;height:60vmin;border:4px solid white;border-radius:12px;box-shadow:0 0 20px rgba(0,0,0,0.5)}
+  </style>
+</head>
+<body>
+  <div id="ar"></div>
+  <div id="loading" class="ui">Iniciando...</div>
+  <div id="scanningUI" class="ui"><div class="scanningBox"></div></div>
+  <div id="toolbar" class="ui" style="display: none;">
+    <button id="prevBtn">◀ Anterior</button>
+    <label>Página: <select id="pageSel"></select></label>
+    <button id="nextBtn">Próxima ▶</button>
+  </div>
+  <div id="badge" class="ui"></div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+    import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+    import { MindARThree } from "mindar-image-three";
+
+    const PAGES = [
+      { label: "1 • Fonte", mind: "./targets/page01.mind", models: [{ file: "./models/fonte.glb", portion: 0.6, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "2 • Ana", mind: "./targets/page02.mind", models: [{ file: "./models/Ana.glb", portion: 0.45, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "3 • Minerva", mind: "./targets/page03.mind", models: [{ file: "./models/minerva.glb", portion: 0.4, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "4 • Árvore", mind: "./targets/page04.mind", models: [{ file: "./models/arvore.glb", portion: 0.5, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "5 • Teatro e Peça", mind: "./targets/page05.mind", models: [{ file: "./models/teatrosantaisabel.glb", portion: 0.3, pos:{x:-0.25, y:0, z:0}, rot:{x:0, y:0, z:0} }, { file: "./models/peça.glb", portion: 0.3, pos:{x: 0.25, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "6 • Bailarinas", mind: "./targets/page06.mind", models: [{ file: "./models/bailarinas.glb", portion: 0.5, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "7 • Desenho", mind: "./targets/page07.mind", models: [{ file: "./models/Desenho.glb", portion: 0.5, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "8 • Mapa e Caixa", mind: "./targets/page08.mind", models: [{ file: "./models/mapa.glb", portion: 0.35, pos:{x:-0.2, y:0, z:0}, rot:{x:0, y:0, z:0} }, { file: "./models/caixa.glb", portion: 0.35, pos:{x: 0.2, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "9 • Palacio da Justiça", mind: "./targets/page09.mind", models: [{ file: "./models/palaciojustica.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "10 • Estrelas", mind: "./targets/page10.mind", models: [{ file: "./models/estrelas.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "11 • Baobá", mind: "./targets/page11.mind", models: [{ file: "./models/baobá.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "12 • Baobá Ceninha", mind: "./targets/page12.mind", models: [{ file: "./models/baobaceninha.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "13 • Ana 2", mind: "./targets/page13.mind", models: [{ file: "./models/Ana2.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "14 • Livro", mind: "./targets/page14.mind", models: [{ file: "./models/livro.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "15 • Chave", mind: "./targets/page15.mind", models: [{ file: "./models/chave.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "16 • Ana e Avó", mind: "./targets/page16.mind", models: [{ file: "./models/anaeavo.glb", portion: 0.5, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+    ];
+    const DEFAULT_ROT_X = 0;
+    const MINDAR_PARAMS = { filterMinCF: 0.0003, filterBeta: 0.005, warmupTolerance: 2, missTolerance: 3, maxTrack: 1, uiScanning: "#scanningUI" };
+
+    const container = document.getElementById("ar"), loadingEl = document.getElementById("loading"), badgeEl = document.getElementById("badge"), sel = document.getElementById("pageSel"), prevBtn = document.getElementById("prevBtn"), nextBtn = document.getElementById("nextBtn"), scanningUI = document.getElementById("scanningUI"), toolbarEl = document.getElementById("toolbar");
+    
+    const loader = new GLTFLoader();
+    const draco = new DRACOLoader(); draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+    loader.setDRACOLoader(draco);
+
+    // NOVO: Função para "aquecer" o cache do navegador
+    async function warmUpBrowserCache() {
+        console.log("Aquecendo o cache do navegador...");
+        const allUrls = new Set();
+        for (const page of PAGES) {
+            allUrls.add(page.mind);
+            for (const model of page.models) {
+                allUrls.add(model.file);
+            }
         }
+        // Dispara todos os downloads em paralelo, sem esperar por eles
+        for (const url of allUrls) {
+            fetch(url); // Apenas o ato de chamar fetch já armazena no cache
+        }
+        console.log(`${allUrls.size} arquivos enviados para pré-carregamento.`);
+    }
+
+    function fitCenterPlace(model, portion, pos, rot){
+      const box = new THREE.Box3().setFromObject(model);
+      const center = new THREE.Vector3(); box.getCenter(center);
+      model.position.sub(center);
+      const group = new THREE.Group(); group.add(model);
+      group.rotation.set(DEFAULT_ROT_X + (rot.x || 0), rot.y || 0, rot.z || 0);
+      group.updateMatrixWorld(true);
+      const sizedBox = new THREE.Box3().setFromObject(group);
+      const size = new THREE.Vector3(); sizedBox.getSize(size);
+      const scale = portion / Math.max(size.x, size.y, size.z || 1e-6);
+      group.scale.multiplyScalar(scale);
+      group.position.set(pos.x || 0, pos.y || 0, pos.z || 0);
+      group.updateMatrixWorld(true);
+      const finalBox = new THREE.Box3().setFromObject(group);
+      group.position.z -= finalBox.min.z;
+      return group;
+    }
+
+    let mindar = null;
+    let currentIndex = 0;
+    
+    async function stopAndClear(){
+      if (mindar) { mindar.stop(); }
+      document.querySelectorAll('.mindar-ui-overlay').forEach(el => el.remove());
+      container.innerHTML = ""; mindar = null;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    async function startPage(index){
+      currentIndex = index; sel.value = String(index);
+      const cfg = PAGES[index]; badgeEl.textContent = cfg.label;
+      
+      loadingEl.textContent = "Abrindo câmera...";
+      loadingEl.style.display = "flex";
+      scanningUI.style.display = "none";
+
+      await stopAndClear();
+
+      mindar = new MindARThree({ container, imageTargetSrc: cfg.mind, ...MINDAR_PARAMS });
+      
+      const { renderer, scene, camera } = mindar;
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+      const anchor = mindar.addAnchor(0);
+      anchor.onTargetFound = () => { anchor.group.visible = true; scanningUI.style.display = "none"; };
+      anchor.onTargetLost  = () => { anchor.group.visible = false; scanningUI.style.display = "flex"; };
+
+      for (const modelCfg of cfg.models) {
+        // Usa o GLTFLoader diretamente. Ele também se beneficia do cache do navegador.
+        const gltf = await loader.loadAsync(modelCfg.file);
+        const clone = SkeletonUtils.clone(gltf.scene);
+        const finalGroup = fitCenterPlace(clone, modelCfg.portion, modelCfg.pos, modelCfg.rot);
+        anchor.group.add(finalGroup);
       }
-    </script>
+      anchor.group.visible = false;
 
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background: #000;
-        overflow: hidden;
-      }
+      await mindar.start();
+      loadingEl.style.display = "none";
+      scanningUI.style.display = "flex";
 
-      /* Container em tela cheia, seguro para mobile */
-      #ar-container {
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100dvh;   /* unidades dinâmicas evitam "salto" com a barra do navegador */
-        height: 100svh;   /* fallback para iOS */
-        background: #000;
-        overflow: hidden;
-        touch-action: none;
-      }
+      const onResize = ()=>{ renderer.setSize(container.clientWidth, container.clientHeight); camera.aspect = container.clientWidth / container.clientHeight; camera.updateProjectionMatrix(); };
+      window.addEventListener("resize", onResize, { once:true }); onResize();
+      renderer.setAnimationLoop(()=>renderer.render(scene,camera));
+    }
 
-      /* Garanta que vídeo e canvas preencham o container */
-      #ar-container > video,
-      #ar-container > canvas {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;  /* elimina faixas pretas */
-      }
+    async function main() {
+      PAGES.forEach((p, i) => { const opt = document.createElement("option"); opt.value = String(i); opt.textContent = p.label; sel.appendChild(opt); });
+      
+      const urlP = Number(new URLSearchParams(location.search).get("p"));
+      currentIndex = Number.isFinite(urlP) && urlP >= 0 && urlP < PAGES.length ? urlP : 0;
+      
+      loadingEl.textContent = `Carregando página ${currentIndex + 1}...`;
+      await startPage(currentIndex);
+      
+      toolbarEl.style.display = "flex";
 
-      /* Overlay de carregamento */
-      #loading {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-        background: rgba(0, 0, 0, .5);
-        z-index: 10;
-      }
-    </style>
-  </head>
+      warmUpBrowserCache();
 
-  <body>
-    <div id="ar-container"></div>
-    <div id="loading">Abrindo a câmera… autorize o uso.</div>
+      prevBtn.onclick = ()=> startPage( (currentIndex - 1 + PAGES.length) % PAGES.length );
+      nextBtn.onclick = ()=> startPage( (currentIndex + 1) % PAGES.length );
+      sel.onchange    = ()=> startPage( Number(sel.value) );
+    }
 
-    <script type="module">
-      import * as THREE from "three";
-      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-      import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-      import { MindARThree } from "mindar-image-three";
-
-      // 1) Inicializa MindAR no container dedicado
-      const container = document.querySelector("#ar-container");
-      const mindarThree = new MindARThree({
-        container,
-        imageTargetSrc: "./targets/page1.mind",
-        maxTrack: 1,
-        filterMinCF: 0.0005,   // mais baixo = mais suave
-        filterBeta:   0.01,    // maior = responde mais rápido
-        warmupTolerance: 2,    // evita falso positivo ao iniciar
-        missTolerance:   2     // evita falso “perdeu alvo”
-      });
-
-      const { renderer, scene, camera } = mindarThree;
-
-      // Iluminação (inclui sombra para contato)
-      renderer.shadowMap.enabled = true;
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.6));
-
-      const dir = new THREE.DirectionalLight(0xffffff, 1);
-      dir.position.set(0.6, 1.2, 0.8);
-      dir.castShadow = true;
-      dir.shadow.mapSize.set(1024, 1024);
-      scene.add(dir);
-
-      // 2) Anchor do primeiro (e único) alvo do .mind
-      const anchor = mindarThree.addAnchor(0);
-
-      // (Opcional) Plano de oclusão e plano receptor de sombra ancorados à página
-      const GROUND_SIZE = 1.0; // ~largura do alvo
-      const occluder = new THREE.Mesh(
-        new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
-        new THREE.MeshBasicMaterial({ colorWrite: false })
-      );
-      occluder.renderOrder = 0;
-      anchor.group.add(occluder);
-
-      const shadowPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
-        new THREE.ShadowMaterial({ opacity: 0.35 })
-      );
-      shadowPlane.receiveShadow = true;
-      shadowPlane.position.z = 0.0002; // evita z-fighting
-      shadowPlane.renderOrder = 1;
-      anchor.group.add(shadowPlane);
-
-      // 3) Cubo de debug ancorado (opcional)
-      const debugCube = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.2, 0.2),
-        new THREE.MeshNormalMaterial()
-      );
-      debugCube.visible = false;
-      anchor.group.add(debugCube);
-
-      // 4) Função utilitária: encaixa o modelo na página e "apoia" no plano (Z)
-      const TARGET_PORTION = 0.35; // 35% da largura do alvo
-      function fitAndPlaceOnPage(obj, portion = TARGET_PORTION) {
-        obj.updateWorldMatrix(true, true);
-        const box = new THREE.Box3().setFromObject(obj);
-        const size = new THREE.Vector3();
-        box.getSize(size);
-
-        const maxXY = Math.max(size.x, size.y) || 1e-6;
-        const s = portion / maxXY;
-        obj.scale.multiplyScalar(s);
-
-        // Recalcula e apoia no "chão"
-        obj.updateWorldMatrix(true, true);
-        const box2 = new THREE.Box3().setFromObject(obj);
-        const heightZ = box2.max.z - box2.min.z;
-        obj.position.set(0, 0, heightZ / 2 + 0.003);
-      }
-
-      // 5) Carregamento do modelo GLB (Minerva.glb) e ancoragem
-      const loader = new GLTFLoader();
-
-      // (Opcional) Caso Minerva.glb esteja comprimido com Draco
-      const draco = new DRACOLoader();
-      draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
-      loader.setDRACOLoader(draco);
-
-      let model = null;
-
-      loader.load(
-        "./models/Minerva.glb",
-        (gltf) => {
-          model = gltf.scene;
-
-          // Habilita sombras
-          model.traverse((n) => {
-            if (n.isMesh) n.castShadow = true;
-          });
-
-          anchor.group.add(model);
-
-          // Se vier “deitado”/virado, ajuste aqui:
-          // model.rotation.x = -Math.PI / 2;
-          // model.rotation.y = Math.PI;
-
-          // Encaixa e apoia na página
-          fitAndPlaceOnPage(model, 1); // ajuste 0.2–0.6 conforme preferir
-
-          model.visible = false;
-          console.log("Minerva.glb carregado, ancorado e posicionado.");
-        },
-        undefined,
-        (err) => console.error("Erro ao carregar Minerva.glb:", err)
-      );
-
-      // 6) Mostrar/ocultar quando o alvo é detectado
-      anchor.onTargetFound = () => {
-        debugCube.visible = true;
-        if (model) model.visible = true;
-      };
-      anchor.onTargetLost = () => {
-        debugCube.visible = false;
-        if (model) model.visible = false;
-      };
-
-      // 7) Início do AR e laço de renderização
-      await mindarThree.start();
-      document.getElementById("loading").style.display = "none";
-
-      const onResize = () => {
-        const w = container.clientWidth;
-        const h = container.clientHeight;
-        renderer.setSize(w, h);
-        renderer.setPixelRatio(window.devicePixelRatio || 1);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      };
-      window.addEventListener("resize", onResize);
-      onResize();
-
-      renderer.setAnimationLoop(() => {
-        renderer.render(scene, camera);
-      });
-    </script>
-  </body>
+    main().catch(err => {
+      console.error("Falha fatal ao iniciar a aplicação:", err);
+      loadingEl.textContent = "Ocorreu um erro. Verifique o console.";
+    });
+  </script>
+</body>
 </html>
