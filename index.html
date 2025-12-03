@@ -50,18 +50,18 @@
     const PAGES = [
       { label: "Capa", mind: "./targets/capa.mind", models: [
         { file: "./models/Capa.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} },] },
-      { label: "1 • Fonte", mind: "./targets/pag01.mind", models: [{ file: "./models/anafonte.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "2 • Ana", mind: "./targets/pag02.mind", models: [{ file: "./models/anafonte.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "3 • Minerva", mind: "./targets/pag03.mind", models: [{ file: "./models/minervaearvore.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "4 • Bailarinas", mind: "./targets/pag04.mind", models: [{ file: "./models/bailarinas.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "5 • Ana Mapa", mind: "./targets/pag05.mind", models: [{ file: "./models/anamapa.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "6 • Mapa", mind: "./targets/pag06.mind", models: [{ file: "./models/mapa.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "7 • Baobá", mind: "./targets/pag07.mind", models: [{ file: "./models/baobaceninha.glb", portion: 0.5, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "8 • Baobá 2", mind: "./targets/pag08.mind", models: [{ file: "./models/baobaceninha2.glb",  portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "9 • Ana no Banco", mind: "./targets/pag09.mind", models: [{ file: "./models/ananobanco.glb", portion: 1, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
-      { label: "10 • Chave", mind: "./targets/pag10.mind", models: [{ file: "./models/chave.glb", portion: 1, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
-      { label: "11 • Ana e Avó", mind: "./targets/pag11.mind", models: [{ file: "./models/anaeavo.glb", portion: 1, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
-      { label: "12 • Ana e Avó 2", mind: "./targets/pag12.mind", models: [{ file: "./models/anaeavo.glb", portion: 1, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] }
+      { label: "1 • Fonte", mind: "./targets/pag01.mind", models: [{ file: "./models/anafonte.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "2 • Ana", mind: "./targets/pag02.mind", models: [{ file: "./models/anafonte.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "3 • Minerva", mind: "./targets/pag03.mind", models: [{ file: "./models/minervaearvore.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "4 • Bailarinas", mind: "./targets/pag04.mind", models: [{ file: "./models/bailarinas.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "5 • Ana Mapa", mind: "./targets/pag05.mind", models: [{ file: "./models/anamapa.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "6 • Mapa", mind: "./targets/pag06.mind", models: [{ file: "./models/mapa.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "7 • Baobá", mind: "./targets/pag07.mind", models: [{ file: "./models/baobaceninha.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "8 • Baobá 2", mind: "./targets/pag08.mind", models: [{ file: "./models/baobaceninha2.glb",  portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
+      { label: "9 • Ana no Banco", mind: "./targets/pag09.mind", models: [{ file: "./models/ananobanco.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "10 • Chave", mind: "./targets/pag10.mind", models: [{ file: "./models/chave.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "11 • Ana e Avó", mind: "./targets/pag11.mind", models: [{ file: "./models/anaeavo.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
+      { label: "12 • Ana e Avó 2", mind: "./targets/pag12.mind", models: [{ file: "./models/anaeavo.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] }
     ];
 
     const DEFAULT_ROT_X = 0;
@@ -79,6 +79,16 @@
     const loader = new GLTFLoader();
     const draco  = new DRACOLoader(); draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
     loader.setDRACOLoader(draco);
+
+    const modelCache = new Map();
+    async function getModelClone(file){
+      if (!modelCache.has(file)) {
+        const gltf = await loader.loadAsync(file);
+        modelCache.set(file, gltf.scene);
+      }
+      // sempre retorna um clone independente
+      return SkeletonUtils.clone(modelCache.get(file));
+    }
 
     // Opcional: “aquecimento” do cache do navegador
     async function warmUpBrowserCache() {
@@ -188,27 +198,7 @@
       anchor.onTargetFound = () => { anchor.group.visible = true; scanningUI.style.display = "none"; };
       anchor.onTargetLost  = () => { anchor.group.visible = false; scanningUI.style.display = "flex"; };
 
-      // ===== Modelos =====
-      for (const modelCfg of cfg.models) {
-        const gltf = await loader.loadAsync(modelCfg.file);
-        const clone = SkeletonUtils.clone(gltf.scene);
-
-        // projeta sombras
-        clone.traverse(n => {
-          if (n.isMesh) {
-            n.castShadow = true;
-            // n.receiveShadow = true; // habilite se desejar
-          }
-        });
-
-        const finalGroup = fitCenterPlace(clone, modelCfg.portion, modelCfg.pos, modelCfg.rot);
-        anchor.group.add(finalGroup);
-      }
       anchor.group.visible = false;
-
-      await mindar.start();
-      loadingEl.style.display = "none";
-      scanningUI.style.display = "flex";
 
       const onResize = ()=>{
         const w = container.clientWidth, h = container.clientHeight;
@@ -218,6 +208,23 @@
       };
       window.addEventListener("resize", onResize, { once:true }); onResize();
       renderer.setAnimationLoop(()=>renderer.render(scene, camera));
+
+      // Inicia a camera/scan antes de carregar GLB para evitar espera
+      await mindar.start();
+      loadingEl.style.display = "none";
+      scanningUI.style.display = "flex";
+
+      // ===== Modelos (assincrono, para nao travar camera) =====
+      await Promise.all(cfg.models.map(async (modelCfg) => {
+        const clone = await getModelClone(modelCfg.file);
+
+        clone.traverse(n => {
+          if (n.isMesh) n.castShadow = true;
+        });
+
+        const finalGroup = fitCenterPlace(clone, modelCfg.portion, modelCfg.pos, modelCfg.rot);
+        anchor.group.add(finalGroup);
+      }));
     }
 
     async function main() {
