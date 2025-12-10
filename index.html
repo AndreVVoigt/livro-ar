@@ -1,258 +1,274 @@
 ﻿<!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>Livro AR — Carregamento Estável + Iluminação</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Livro AR — AR.js</title>
 
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/",
-        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
-      }
-    }
-  </script>
+  <!-- A-Frame 1.5.0 -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- AR.js NFT (Image Tracking) -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
 
   <style>
-    html,body{margin:0;height:100%;background:#000;overflow:hidden}
-    #ar{position:fixed;inset:0;width:100vw;height:100dvh;height:100svh;touch-action:none}
-    #ar>video,#ar>canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-    .ui{position:fixed;z-index:20;font:14px system-ui,-apple-system,Segoe UI,Roboto,Arial}
-    #loading{inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.5)}
-    #toolbar{left:50%;transform:translateX(-50%);bottom:10px;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.5);padding:8px 10px;border-radius:12px;color:#fff}
-    #toolbar select,#toolbar button{font:14px system-ui;padding:6px 10px;border-radius:8px;border:1px solid #666;background:#1f1f1f;color:#fff}
-    #badge{right:10px;top:10px;background:rgba(0,0,0,.55);color:#fff;padding:6px 10px;border-radius:10px}
-    #scanningUI{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:transparent;z-index:10}
-    .scanningBox{width:60vmin;height:60vmin;border:4px solid white;border-radius:12px;box-shadow:0 0 20px rgba(0,0,0,0.5)}  
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    /* Loader do AR.js */
+    .arjs-loader {
+      height: 100%;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 1.25rem;
+      font-weight: bold;
+      pointer-events: none;
+    }
+
+    /* Interface do usuário */
+    .ui {
+      position: fixed;
+      z-index: 10000;
+      user-select: none;
+    }
+
+    #toolbar {
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px 14px;
+      border-radius: 16px;
+      color: #fff;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    #toolbar select,
+    #toolbar button {
+      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #toolbar button:active {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    #toolbar select {
+      background: #222;
+    }
+
+    #badge {
+      right: 16px;
+      top: 16px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-weight: 500;
+      font-size: 14px;
+      backdrop-filter: blur(4px);
+    }
+
+    /* Feedback de Scanning (Guia visual) */
+    #scanning-guide {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .guide-box {
+      width: 60vmin;
+      height: 60vmin;
+      border: 2px dashed rgba(255, 255, 255, 0.5);
+      border-radius: 16px;
+      box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.3);
+      /* Dim outside */
+    }
   </style>
 </head>
-<body>
-  <div id="ar"></div>
-  <div id="loading" class="ui">Iniciando...</div>
-  <div id="scanningUI" class="ui"><div class="scanningBox"></div></div>
-  <div id="toolbar" class="ui" style="display: none;">
-    <button id="prevBtn">◀ Anterior</button>
-    <label>Página: <select id="pageSel"></select></label>
-    <button id="nextBtn">Próxima ▶</button>
-  </div>
-  <div id="badge" class="ui"></div>
 
-  <script type="module">
-    import * as THREE from "three";
-    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-    import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-    import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-    import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-    import { MindARThree } from "mindar-image-three";
+<body>
+
+  <!-- Mensagem de Loading do AR.js (Controlado automaticamente pelo script do AR.js, mas customizamos o estilo acima) -->
+  <div class="arjs-loader">
+    <div>Carregando marcadores...</div>
+  </div>
+
+  <!-- UI -->
+  <div id="scanning-guide">
+    <div class="guide-box"></div>
+  </div>
+
+  <div id="badge" class="ui">Iniciando...</div>
+
+  <div id="toolbar" class="ui">
+    <button id="prevBtn">◀</button>
+    <select id="pageSel"></select>
+    <button id="nextBtn">▶</button>
+  </div>
+
+  <!-- O Scene do A-Frame será injetado aqui via JS -->
+  <div id="scene-container"></div>
+
+  <script>
+    // Configurações das páginas
+    // IMPORTANTE: Para AR.js NFT, você precisa gerar descritores (.fset, .fset3, .iset)
+    // Use https://carnaux.github.io/NFT-Marker-Creator/
+    // Os caminhos abaixo assumem que você salvou os arquivos em 'targets/nft/' com o mesmo nome base dos arquivos .mind antigos.
+    // Exemplo: 'targets/capa' significa que existem 'targets/capa.fset', 'targets/capa.fset3', etc.
 
     const PAGES = [
-      { label: "Capa", mind: "./targets/capa.mind", models: [
-        { file: "./models/Capa.glb", portion: 1, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} },] },
-      { label: "1 • Fonte", mind: "./targets/pag01.mind", models: [{ file: "./models/anafonte.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "2 • Ana", mind: "./targets/pag02.mind", models: [{ file: "./models/anafonte.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "3 • Minerva", mind: "./targets/pag03.mind", models: [{ file: "./models/minervaearvore.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "4 • Bailarinas", mind: "./targets/pag04.mind", models: [{ file: "./models/bailarinas.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "5 • Ana Mapa", mind: "./targets/pag05.mind", models: [{ file: "./models/anamapa.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "6 • Mapa", mind: "./targets/pag06.mind", models: [{ file: "./models/mapa.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "7 • Baobá", mind: "./targets/pag07.mind", models: [{ file: "./models/baobaceninha.glb", portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "8 • Recorte", mind: "./targets/pag08.mind", models: [{ file: "./models/recorte.glb",  portion: 1.2, pos:{x:0, y:0, z:0}, rot:{x:0, y:0, z:0} }] },
-      { label: "9 • Ana no Banco", mind: "./targets/pag09.mind", models: [{ file: "./models/ananobanco.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
-      { label: "10 • Chave", mind: "./targets/pag10.mind", models: [{ file: "./models/chave.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
-      { label: "11 • Ana e Avó", mind: "./targets/pag11.mind", models: [{ file: "./models/anaeavo.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] },
-      { label: "12 • Fim", mind: "./targets/pag12.mind", models: [{ file: "./models/fim.glb", portion: 1.2, pos:{x:0,y:0,z:0}, rot:{x:0,y:0,z:0} }] }
+      {
+        label: "Capa", nft: "./targets/nft/capa", models: [
+          { file: "./models/Capa.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }
+        ]
+      },
+      { label: "1 • Fonte", nft: "./targets/nft/pag01", models: [{ file: "./models/anafonte.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "2 • Ana", nft: "./targets/nft/pag02", models: [{ file: "./models/anafonte.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "3 • Minerva", nft: "./targets/nft/pag03", models: [{ file: "./models/minervaearvore.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "4 • Bailarinas", nft: "./targets/nft/pag04", models: [{ file: "./models/bailarinas.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "5 • Ana Mapa", nft: "./targets/nft/pag05", models: [{ file: "./models/anamapa.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "6 • Mapa", nft: "./targets/nft/pag06", models: [{ file: "./models/mapa.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "7 • Baobá", nft: "./targets/nft/pag07", models: [{ file: "./models/baobaceninha.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "8 • Recorte", nft: "./targets/nft/pag08", models: [{ file: "./models/recorte.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "9 • Ana no Banco", nft: "./targets/nft/pag09", models: [{ file: "./models/ananobanco.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "10 • Chave", nft: "./targets/nft/pag10", models: [{ file: "./models/chave.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "11 • Ana e Avó", nft: "./targets/nft/pag11", models: [{ file: "./models/anaeavo.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] },
+      { label: "12 • Fim", nft: "./targets/nft/pag12", models: [{ file: "./models/fim.glb", scale: 150, pos: "0 0 0", rot: "90 0 0" }] }
     ];
 
-    const DEFAULT_ROT_X = 0;
-    const MINDAR_PARAMS = { filterMinCF: 0.0003, filterBeta: 0.005, warmupTolerance: 2, missTolerance: 3, maxTrack: 1, uiScanning: "#scanningUI" };
+    // Detecta índice atual da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentIndex = parseInt(urlParams.get('p')) || 0;
+    if (currentIndex < 0 || currentIndex >= PAGES.length) currentIndex = 0;
 
-    const container = document.getElementById("ar"),
-          loadingEl  = document.getElementById("loading"),
-          badgeEl    = document.getElementById("badge"),
-          sel        = document.getElementById("pageSel"),
-          prevBtn    = document.getElementById("prevBtn"),
-          nextBtn    = document.getElementById("nextBtn"),
-          scanningUI = document.getElementById("scanningUI"),
-          toolbarEl  = document.getElementById("toolbar");
+    const currentConfig = PAGES[currentIndex];
 
-    const loader = new GLTFLoader();
-    const draco  = new DRACOLoader(); draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
-    loader.setDRACOLoader(draco);
+    // Atualiza UI
+    document.getElementById('badge').textContent = currentConfig.label;
 
-    const modelCache = new Map();
-    async function getModelClone(file){
-      if (!modelCache.has(file)) {
-        const gltf = await loader.loadAsync(file);
-        modelCache.set(file, gltf.scene);
-      }
-      // sempre retorna um clone independente
-      return SkeletonUtils.clone(modelCache.get(file));
-    }
-
-    // Opcional: “aquecimento” do cache do navegador
-    async function warmUpBrowserCache() {
-      const all = new Set();
-      for (const p of PAGES) {
-        all.add(p.mind);
-        for (const m of p.models) all.add(m.file);
-      }
-      for (const url of all) fetch(url).catch(()=>{});
-    }
-
-    function fitCenterPlace(model, portion, pos, rot){
-      const box = new THREE.Box3().setFromObject(model);
-      const center = new THREE.Vector3(); box.getCenter(center);
-      model.position.sub(center);
-
-      const group = new THREE.Group(); group.add(model);
-      group.rotation.set(DEFAULT_ROT_X + (rot.x||0), rot.y||0, rot.z||0);
-      group.updateMatrixWorld(true);
-
-      const sizedBox = new THREE.Box3().setFromObject(group);
-      const size = new THREE.Vector3(); sizedBox.getSize(size);
-      const scale = portion / Math.max(size.x, size.y, size.z || 1e-6);
-      group.scale.multiplyScalar(scale);
-      group.position.set(pos.x||0, pos.y||0, pos.z||0);
-      group.updateMatrixWorld(true);
-
-      const finalBox = new THREE.Box3().setFromObject(group);
-      group.position.z -= finalBox.min.z;
-      return group;
-    }
-
-    let mindar = null;
-    let currentIndex = 0;
-
-    async function stopAndClear(){
-      if (mindar) { try { await mindar.stop(); } catch {} }
-      document.querySelectorAll('.mindar-ui-overlay').forEach(el => el.remove());
-      container.innerHTML = ""; mindar = null;
-      await new Promise(r => setTimeout(r, 50));
-    }
-
-    async function startPage(index){
-      currentIndex = index; sel.value = String(index);
-      const cfg = PAGES[index]; badgeEl.textContent = cfg.label;
-
-      loadingEl.textContent = "Abrindo câmera...";
-      loadingEl.style.display = "flex";
-      scanningUI.style.display = "none";
-
-      await stopAndClear();
-
-      mindar = new MindARThree({ container, imageTargetSrc: cfg.mind, ...MINDAR_PARAMS });
-      const { renderer, scene, camera } = mindar;
-
-      // ===== RENDERER PBR / SOMBRAS =====
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.0;
-      renderer.physicallyCorrectLights = true;
-      renderer.shadowMap.enabled = false;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-      // ===== IBL (RoomEnvironment) + luz ambiente =====
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-      scene.environment = envTex;
-      scene.background  = null;
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 0.35));
-
-      // ===== Anchor e rig de luzes preso ao alvo =====
-      const anchor = mindar.addAnchor(0);
-
-      const lightRig = new THREE.Group();
-      anchor.group.add(lightRig);
-
-      const key = new THREE.DirectionalLight(0xffffff, 1.35);
-      key.position.set(0.8, 1.2, 0.8);
-      key.castShadow = true;
-      key.shadow.mapSize.set(1024, 1024);
-      key.shadow.camera.near = 0.01;
-      key.shadow.camera.far  = 4.0;
-      key.shadow.camera.left = -1; key.shadow.camera.right = 1;
-      key.shadow.camera.top  =  1; key.shadow.camera.bottom = -1;
-      key.shadow.bias = -0.0005;
-      key.shadow.normalBias = 0.02;
-      lightRig.add(key);
-
-      const fill = new THREE.DirectionalLight(0xffffff, 0.45);
-      fill.position.set(-0.8, 0.8, 0.3);
-      lightRig.add(fill);
-
-      const rim = new THREE.DirectionalLight(0xffffff, 0.25);
-      rim.position.set(0.0, 0.3, -0.8);
-      lightRig.add(rim);
-
-      // Plano receptor de sombra (tamanho ~ da página)
-      const shadowPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.2, 1.2),
-        new THREE.ShadowMaterial({ opacity: 0.35 })
-      );
-      shadowPlane.receiveShadow = true;
-      shadowPlane.renderOrder = 0;
-      shadowPlane.position.z = 0.0002;
-      anchor.group.add(shadowPlane);
-
-      anchor.onTargetFound = () => { anchor.group.visible = true; scanningUI.style.display = "none"; };
-      anchor.onTargetLost  = () => { anchor.group.visible = false; scanningUI.style.display = "flex"; };
-
-      anchor.group.visible = false;
-
-      const onResize = ()=>{
-        const w = container.clientWidth, h = container.clientHeight;
-        renderer.setSize(w, h);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
-        camera.aspect = w / h; camera.updateProjectionMatrix();
-      };
-      window.addEventListener("resize", onResize, { once:true }); onResize();
-      renderer.setAnimationLoop(()=>renderer.render(scene, camera));
-
-      // Inicia a camera/scan antes de carregar GLB para evitar espera
-      await mindar.start();
-      loadingEl.style.display = "none";
-      scanningUI.style.display = "flex";
-
-      // ===== Modelos (assincrono, para nao travar camera) =====
-      await Promise.all(cfg.models.map(async (modelCfg) => {
-        const clone = await getModelClone(modelCfg.file);
-
-        clone.traverse(n => {
-          if (n.isMesh) n.castShadow = true;
-        });
-
-        const finalGroup = fitCenterPlace(clone, modelCfg.portion, modelCfg.pos, modelCfg.rot);
-        anchor.group.add(finalGroup);
-      }));
-    }
-
-    async function main() {
-      PAGES.forEach((p, i) => {
-        const opt = document.createElement("option");
-        opt.value = String(i);
-        opt.textContent = p.label;
-        sel.appendChild(opt);
-      });
-
-      const urlP = Number(new URLSearchParams(location.search).get("p"));
-      currentIndex = Number.isFinite(urlP) && urlP >= 0 && urlP < PAGES.length ? urlP : 0;
-
-      loadingEl.textContent = `Carregando página ${currentIndex + 1}...`;
-      await startPage(currentIndex);
-
-      toolbarEl.style.display = "flex";
-      warmUpBrowserCache().catch(()=>{});
-
-      prevBtn.onclick = ()=> startPage( (currentIndex - 1 + PAGES.length) % PAGES.length );
-      nextBtn.onclick = ()=> startPage( (currentIndex + 1) % PAGES.length );
-      sel.onchange    = ()=> startPage( Number(sel.value) );
-    }
-
-    main().catch(err => {
-      console.error("Falha fatal ao iniciar a aplicação:", err);
-      loadingEl.textContent = "Ocorreu um erro. Verifique o console.";
+    // Preenche Select
+    const sel = document.getElementById("pageSel");
+    PAGES.forEach((p, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = p.label;
+      if (i === currentIndex) opt.selected = true;
+      sel.appendChild(opt);
     });
+
+    // Navegação
+    const navigate = (idx) => {
+      // Recarrega a página com o novo índice para limpar completamente o contexto AR
+      window.location.search = `?p=${idx}`;
+    };
+
+    document.getElementById("prevBtn").onclick = () => {
+      const nextIdx = (currentIndex - 1 + PAGES.length) % PAGES.length;
+      navigate(nextIdx);
+    };
+    document.getElementById("nextBtn").onclick = () => {
+      const nextIdx = (currentIndex + 1) % PAGES.length;
+      navigate(nextIdx);
+    };
+    sel.onchange = (e) => navigate(e.target.value);
+
+    // Monta a cena A-Frame dinamicamente
+    const sceneContainer = document.getElementById("scene-container");
+
+    // Criamos a string HTML da cena
+    /* 
+       renderer="logarithmicDepthBuffer: true;" -> ajuda com z-fighting em modelos grandes
+       embedded arjs -> configuração padrão do AR.js
+    */
+    let sceneHTML = `
+      <a-scene
+        vr-mode-ui="enabled: false;"
+        renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true; sortObjects: true;"
+        embedded
+        arjs="trackingMethod: best; imageTargetsURL: ${currentConfig.nft}; debugUIEnabled: false;">
+        
+        <!-- Luzes (Simples para A-Frame) -->
+        <a-entity light="type: ambient; color: #fff; intensity: 0.8"></a-entity>
+        <a-entity light="type: directional; color: #fff; intensity: 0.8; castShadow: true" position="1 2 1"></a-entity>
+
+        <!-- Marcador NFT -->
+        <a-nft
+          type="nft"
+          url="${currentConfig.nft}"
+          smooth="true"
+          smoothCount="10"
+          smoothTolerance=".01"
+          smoothThreshold="5"
+        >
+    `;
+
+    // Adiciona os modelos
+    currentConfig.models.forEach(m => {
+      sceneHTML += `
+          <a-entity
+            gltf-model="${m.file}"
+            scale="${m.scale} ${m.scale} ${m.scale}"
+            position="${m.pos}"
+            rotation="${m.rot}"
+          >
+          </a-entity>
+      `;
+    });
+
+    sceneHTML += `
+        </a-nft>
+        <a-entity camera></a-entity>
+      </a-scene>
+    `;
+
+    sceneContainer.innerHTML = sceneHTML;
+
+    // Remove loader quando carregar (evento do AR.js não é perfeito, mas podemos monitorar o loaded da cena)
+    const sceneEl = document.querySelector('a-scene');
+    sceneEl.addEventListener('loaded', () => {
+      // O loader do AR.js (.arjs-loader) é controlado pelo script interno do AR.js, 
+      // ele desaparece automaticamente quando o marcador é carregado/processado.
+      console.log("Cena AR carregada");
+    });
+
+    // Controle do guia de escaneamento
+    // O evento 'markerFound' e 'markerLost' são disparados no <a-nft>
+    const nftEl = document.querySelector('a-nft');
+    nftEl.addEventListener('markerFound', () => {
+      document.getElementById('scanning-guide').style.display = 'none';
+      document.getElementById('badge').textContent = currentConfig.label + " (Detectado)";
+    });
+    nftEl.addEventListener('markerLost', () => {
+      document.getElementById('scanning-guide').style.display = 'flex';
+      document.getElementById('badge').textContent = currentConfig.label;
+    });
+
   </script>
 </body>
+
 </html>
